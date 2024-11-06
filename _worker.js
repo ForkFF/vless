@@ -389,13 +389,47 @@ async function vlessOverWSHandler(request) {
  */
 async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log,) {
 	// 使用 Google DNS 查询 IP
-	async function resolveDNS(address) {
-		const response = await fetch(`https://dns.google/resolve?name=${address}&type=A`);
-		const data = await response.json();
-		if (data.Answer && data.Answer.length > 0) {
-			return data.Answer[0].data;
-		}
-		return null;
+	async function resolveDNSOverTCP(address) {
+	    // 构造 DNS 查询的字节数据包
+	    function createDNSQueryPacket(domain) {
+	        const parts = domain.split('.');
+	        let packet = new Uint8Array([0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+	
+	        parts.forEach(part => {
+	            packet = new Uint8Array([...packet, part.length, ...Buffer.from(part)]);
+	        });
+	
+	        packet = new Uint8Array([...packet, 0x00, 0x00, 0x01, 0x00, 0x01]);
+	        return packet;
+	    }
+	
+	    const dnsQueryPacket = createDNSQueryPacket(address);
+	    const dnsServer = "8.8.8.8"; // Google DNS TCP服务器地址
+	    const port = 53; // DNS 使用的默认端口
+	
+	    try {
+	        // 建立 TCP 连接并发送 DNS 查询
+	        const tcpSocket = await connect({ hostname: dnsServer, port: port });
+	        const writer = tcpSocket.writable.getWriter();
+	        const reader = tcpSocket.readable.getReader();
+	
+	        // 写入 DNS 查询数据
+	        await writer.write(dnsQueryPacket);
+	        writer.releaseLock();
+	
+	        // 读取返回的数据包
+	        const { value: responsePacket } = await reader.read();
+	        reader.releaseLock();
+	
+	        // 解析 IP 地址
+	        if (responsePacket && responsePacket.length >= 28) {
+	            return `${responsePacket[responsePacket.length - 4]}.${responsePacket[responsePacket.length - 3]}.${responsePacket[responsePacket.length - 2]}.${responsePacket[responsePacket.length - 1]}`;
+	        }
+	    } catch (error) {
+	        console.log("DNS-over-TCP query failed:", error);
+	    }
+	
+	    return null; // 查询失败时返回 null
 	}
 
 	// 查询 IP 是否为 Cloudflare 的 ASN
@@ -475,7 +509,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
 
 	// DNS预解析
-	let targetIP = await resolveDNS(addressRemote);
+	let targetIP = await resolveDNSOverTCP(addressRemote);
 	// 判断是否需要代理
 	if (targetIP && await isCloudflareASN(targetIP)) {
 		log(`Address ${addressRemote} resolved to Cloudflare ASN. Using proxyIP or SOCKS5.`);
