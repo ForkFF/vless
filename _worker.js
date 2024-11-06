@@ -404,17 +404,24 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	 * @returns {Promise<import("@cloudflare/workers-types").Socket>} 连接后的 TCP Socket
 	 */
 	async function connectAndWrite(address, port, socks = false) {
-	    const tcpSocket = socks 
-	        ? await socks5Connect(addressType, address, port, log)
-	        : await connect({ hostname: address, port });
+		/** @type {import("@cloudflare/workers-types").Socket} */
+		log(`connected to ${address}:${port}`);
+		//if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(address)) address = `${atob('d3d3Lg==')}${address}${atob('LmlwLjA5MDIyNy54eXo=')}`;
+		// 如果指定使用 SOCKS5 代理，则通过 SOCKS5 协议连接；否则直接连接
+		const tcpSocket = socks ? await socks5Connect(addressType, address, port, log)
+			: connect({
+				hostname: address,
+				port: port,
+			});
 		remoteSocket.value = tcpSocket;
-		//log(connected to ${address}:${port});
+		//log(`connected to ${address}:${port}`);
 		const writer = tcpSocket.writable.getWriter();
 		// 首次写入，通常是 TLS 客户端 Hello 消息
 		await writer.write(rawClientData);
 		writer.releaseLock();
 		return tcpSocket;
 	}
+
 	/**
 	 * 重试函数：当 Cloudflare 的 TCP Socket 没有传入数据时，我们尝试重定向 IP
 	 * 这可能是因为某些网络问题导致的连接失败
@@ -449,15 +456,8 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 
 	let useSocks = false;
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
-	// 首次尝试连接远程服务器	
-	let tcpSocket;
-	try {
-	    tcpSocket = await connectAndWrite(addressRemote, portRemote, false);
-	} catch (error) {
-	    log("Direct connection failed.");
-	    await retry();
-	    return;
-	}
+	// 首次尝试连接远程服务器
+	let tcpSocket = await connectAndWrite(addressRemote, portRemote, useSocks);
 
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
 	// 建立从远程服务器到 WebSocket 的数据流，用于将远程服务器的响应发送回客户端
