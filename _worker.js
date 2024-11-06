@@ -479,7 +479,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	// 判断是否需要代理
 	if (targetIP && await isCloudflareASN(targetIP)) {
 		log(`Address ${addressRemote} resolved to Cloudflare ASN. Using proxyIP or SOCKS5.`);
-		useSocks = true;
+		if (enableSocks) useSocks = true;
 		addressRemote = proxyIP || addressRemote;
 	}
 	// 首次尝试连接远程服务器
