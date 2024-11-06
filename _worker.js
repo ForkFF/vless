@@ -428,12 +428,14 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	        if (responsePacket && responsePacket.length >= 12) {
 	            // 返回解析出的 IP 地址
 	            return `${responsePacket[responsePacket.length - 4]}.${responsePacket[responsePacket.length - 3]}.${responsePacket[responsePacket.length - 2]}.${responsePacket[responsePacket.length - 1]}`;
-	        },
-		close() {
-                log(`DNS 服务器TCP 连接已关闭`); // 记录连接关闭信息
-            	},
+	        }
 	    } catch (error) {
 	        console.log("DNS-over-TCP query failed:", error);
+	    } finally {
+	        // 确保关闭 TCP 套接字以释放资源
+	        if (tcpSocket) {
+	            tcpSocket.close();
+	        }
 	    }
 	
 	    return null; // 查询失败时返回 null
