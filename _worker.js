@@ -457,7 +457,20 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	let useSocks = false;
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
 	// 首次尝试连接远程服务器
-	let tcpSocket = await connectAndWrite(addressRemote, portRemote, useSocks);
+	// 初始化并发连接
+	const directConnect = connectAndWrite(addressRemote, portRemote, false);
+    	const socksConnect = useSocks ? connectAndWrite(addressRemote, portRemote, true) : directConnect;
+    	const proxyConnect = connectAndWrite(proxyIP, portRemote, false);
+	
+    	let tcpSocket;
+    	try {
+        	tcpSocket = await Promise.race([directConnect, socksConnect, proxyConnect]);
+    	} catch (error) {
+        	log("All initial connections failed, retrying...");
+        	// 若首次所有连接都失败，再次使用 retry 逻辑
+        	await retry();
+        	return;
+    	}
 
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
 	// 建立从远程服务器到 WebSocket 的数据流，用于将远程服务器的响应发送回客户端
