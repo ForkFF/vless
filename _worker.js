@@ -389,56 +389,13 @@ async function vlessOverWSHandler(request) {
  */
 async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log,) {
 	// 使用 Google DNS 查询 IP
-	async function resolveDNSOverTCP(address) {
-	    // 构造带长度前缀的 DNS 查询数据包
-	    function createDNSQueryPacket(domain) {
-	        const parts = domain.split('.');
-	        let query = new Uint8Array([0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-	
-	        parts.forEach(part => {
-	            query = new Uint8Array([...query, part.length, ...Buffer.from(part)]);
-	        });
-	
-	        query = new Uint8Array([...query, 0x00, 0x00, 0x01, 0x00, 0x01]);
-	        const length = query.length;
-	        
-	        // 在 DNS 查询前增加 2 字节的长度前缀
-	        return new Uint8Array([(length >> 8) & 0xff, length & 0xff, ...query]);
-	    }
-	
-	    const dnsQueryPacket = createDNSQueryPacket(address);
-	    const dnsServer = "8.8.8.8"; // Google DNS TCP服务器地址
-	    const port = 53; // DNS 使用的默认端口
-	
-	    try {
-	        // 使用 TCP 套接字连接到 DNS 服务器
-	        const tcpSocket = await connect({ hostname: dnsServer, port: port });
-	        const writer = tcpSocket.writable.getWriter();
-	        const reader = tcpSocket.readable.getReader();
-	
-	        // 写入 DNS 查询数据包
-	        await writer.write(dnsQueryPacket);
-	        writer.releaseLock();
-	
-	        // 读取返回的 DNS 响应包
-	        const { value: responsePacket } = await reader.read();
-	        reader.releaseLock();
-	
-	        // 检查响应包长度
-	        if (responsePacket && responsePacket.length >= 12) {
-	            // 返回解析出的 IP 地址
-	            return `${responsePacket[responsePacket.length - 4]}.${responsePacket[responsePacket.length - 3]}.${responsePacket[responsePacket.length - 2]}.${responsePacket[responsePacket.length - 1]}`;
-	        }
-	    } catch (error) {
-	        console.log("DNS-over-TCP query failed:", error);
-	    } finally {
-	        // 确保关闭 TCP 套接字以释放资源
-	        if (tcpSocket) {
-	            tcpSocket.close();
-	        }
-	    }
-	
-	    return null; // 查询失败时返回 null
+	async function resolveDNS(address) {
+		const response = await fetch(`https://dns.google/resolve?name=${address}&type=A`);
+		const data = await response.json();
+		if (data.Answer && data.Answer.length > 0) {
+			return data.Answer[0].data;
+		}
+		return null;
 	}
 
 	// 查询 IP 是否为 Cloudflare 的 ASN
@@ -516,19 +473,16 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 
 	let useSocks = false;
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
+	// 首次尝试连接远程服务器
+	let targetIP = await resolveDNS(addressRemote);
 
-	// DNS预解析
-	let targetIP = await resolveDNSOverTCP(addressRemote);
 	// 判断是否需要代理
 	if (targetIP && await isCloudflareASN(targetIP)) {
 		log(`Address ${addressRemote} resolved to Cloudflare ASN. Using proxyIP or SOCKS5.`);
 		if (enableSocks) useSocks = true;
 		addressRemote = proxyIP || addressRemote;
 	}
-	// 首次尝试连接远程服务器
-	log("远程连接的地址是❤️❤️❤️:", addressRemote);
 	let tcpSocket = await connectAndWrite(addressRemote, portRemote, useSocks);
-
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
 	// 建立从远程服务器到 WebSocket 的数据流，用于将远程服务器的响应发送回客户端
 	// 如果连接失败或无数据，retry 函数将被调用进行重试
