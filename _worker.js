@@ -457,7 +457,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	let useSocks = false;
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
 	// 首次尝试连接远程服务器
-	console.log("远程连接的地址是❤️❤️❤️:", addressRemote)
+	log("远程连接的地址是❤️❤️❤️:", addressRemote)
 	let tcpSocket = await connectAndWrite(addressRemote, portRemote, useSocks);
 
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
