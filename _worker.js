@@ -460,7 +460,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	// 并行尝试直连和代理
 	let tcpSocket;
 	try {
-	tcpSocket = await Promise.race([
+	tcpSocket = await Promise.any([
 	    connectAndWrite(addressRemote, portRemote, false), // 直连
 	    connectAndWrite(proxyIP || addressRemote, portRemote, false) // 通过代理
 	]);
