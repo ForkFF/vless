@@ -390,17 +390,20 @@ async function vlessOverWSHandler(request) {
 async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log,) {
 	// 使用 Google DNS 查询 IP
 	async function resolveDNSOverTCP(address) {
-	    // 构造 DNS 查询的字节数据包
+	    // 构造带长度前缀的 DNS 查询数据包
 	    function createDNSQueryPacket(domain) {
 	        const parts = domain.split('.');
-	        let packet = new Uint8Array([0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+	        let query = new Uint8Array([0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 	
 	        parts.forEach(part => {
-	            packet = new Uint8Array([...packet, part.length, ...Buffer.from(part)]);
+	            query = new Uint8Array([...query, part.length, ...Buffer.from(part)]);
 	        });
 	
-	        packet = new Uint8Array([...packet, 0x00, 0x00, 0x01, 0x00, 0x01]);
-	        return packet;
+	        query = new Uint8Array([...query, 0x00, 0x00, 0x01, 0x00, 0x01]);
+	        const length = query.length;
+	        
+	        // 在 DNS 查询前增加 2 字节的长度前缀
+	        return new Uint8Array([(length >> 8) & 0xff, length & 0xff, ...query]);
 	    }
 	
 	    const dnsQueryPacket = createDNSQueryPacket(address);
@@ -408,22 +411,22 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	    const port = 53; // DNS 使用的默认端口
 	
 	    try {
-	        // 建立 TCP 连接并发送 DNS 查询
-		log("开始查询dns over tcp");
+	        // 使用 TCP 套接字连接到 DNS 服务器
 	        const tcpSocket = await connect({ hostname: dnsServer, port: port });
 	        const writer = tcpSocket.writable.getWriter();
 	        const reader = tcpSocket.readable.getReader();
 	
-	        // 写入 DNS 查询数据
+	        // 写入 DNS 查询数据包
 	        await writer.write(dnsQueryPacket);
 	        writer.releaseLock();
 	
-	        // 读取返回的数据包
+	        // 读取返回的 DNS 响应包
 	        const { value: responsePacket } = await reader.read();
 	        reader.releaseLock();
 	
-	        // 解析 IP 地址
-	        if (responsePacket && responsePacket.length >= 28) {
+	        // 检查响应包长度
+	        if (responsePacket && responsePacket.length >= 12) {
+	            // 返回解析出的 IP 地址
 	            return `${responsePacket[responsePacket.length - 4]}.${responsePacket[responsePacket.length - 3]}.${responsePacket[responsePacket.length - 2]}.${responsePacket[responsePacket.length - 1]}`;
 	        }
 	    } catch (error) {
