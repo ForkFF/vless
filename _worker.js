@@ -407,8 +407,13 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	    const tcpSocket = socks 
 	        ? await socks5Connect(addressType, address, port, log)
 	        : await connect({ hostname: address, port });
-	    remoteSocket.value = tcpSocket;
-	    return tcpSocket;
+		remoteSocket.value = tcpSocket;
+		//log(connected to ${address}:${port});
+		const writer = tcpSocket.writable.getWriter();
+		// 首次写入，通常是 TLS 客户端 Hello 消息
+		await writer.write(rawClientData);
+		writer.releaseLock();
+		return tcpSocket;
 	}
 	/**
 	 * 重试函数：当 Cloudflare 的 TCP Socket 没有传入数据时，我们尝试重定向 IP
@@ -448,9 +453,6 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	let tcpSocket;
 	try {
 	    tcpSocket = await connectAndWrite(addressRemote, portRemote, false);
-	    const writer = tcpSocket.writable.getWriter();
-	    await writer.write(rawClientData);
-	    writer.releaseLock();
 	} catch (error) {
 	    log("Direct connection failed.");
 	    await retry();
