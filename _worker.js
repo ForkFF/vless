@@ -409,6 +409,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	
 	    try {
 	        // 建立 TCP 连接并发送 DNS 查询
+		log("开始查询dns over tcp")
 	        const tcpSocket = await connect({ hostname: dnsServer, port: port });
 	        const writer = tcpSocket.writable.getWriter();
 	        const reader = tcpSocket.readable.getReader();
