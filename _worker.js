@@ -444,12 +444,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 
 	let useSocks = false;
 	if( go2Socks5s.length > 0 && enableSocks ) useSocks = await useSocks5Pattern(addressRemote);
-	// 首次尝试连接远程服务器
-	// 初始化并发连接
-	const directConnect = connectAndWrite(addressRemote, portRemote, false);
-    	const socksConnect = useSocks ? connectAndWrite(addressRemote, portRemote, true) : directConnect;
-    	const proxyConnect = connectAndWrite(proxyIP, portRemote, false);
-	
+	// 首次尝试连接远程服务器	
 	let tcpSocket;
 	try {
 	    // 首先直接连接
@@ -476,7 +471,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
 	// 建立从远程服务器到 WebSocket 的数据流，用于将远程服务器的响应发送回客户端
 	// 如果连接失败或无数据，retry 函数将被调用进行重试
-	remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
+	//remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
 }
 
 /**
