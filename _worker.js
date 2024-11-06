@@ -452,16 +452,12 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	
 	let tcpSocket;
 	try {
-	    tcpSocket = await Promise.race([proxyConnect, directConnect]);
-	    if (tcpSocket) {
-	        const writer = tcpSocket.writable.getWriter();
-	        await writer.write(rawClientData);
-	        writer.releaseLock();
-	    } else {
-	        throw new Error("No successful connection");
-	    }
+	    tcpSocket = await Promise.any([directConnect, socksConnect, proxyConnect]);
+	    const writer = tcpSocket.writable.getWriter();
+	    await writer.write(rawClientData);
+	    writer.releaseLock();
 	} catch (error) {
-	    log("Direct and SOCKS5 connections failed.");
+	    log("All connections failed.");
 	    await retry();
 	    return;
 	}
