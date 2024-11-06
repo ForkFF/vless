@@ -409,7 +409,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	
 	    try {
 	        // 建立 TCP 连接并发送 DNS 查询
-		log("开始查询dns over tcp")
+		log("开始查询dns over tcp");
 	        const tcpSocket = await connect({ hostname: dnsServer, port: port });
 	        const writer = tcpSocket.writable.getWriter();
 	        const reader = tcpSocket.readable.getReader();
@@ -518,7 +518,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 		addressRemote = proxyIP || addressRemote;
 	}
 	// 首次尝试连接远程服务器
-	log("远程连接的地址是❤️❤️❤️:", addressRemote)
+	log("远程连接的地址是❤️❤️❤️:", addressRemote);
 	let tcpSocket = await connectAndWrite(addressRemote, portRemote, useSocks);
 
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
