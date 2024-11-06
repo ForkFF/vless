@@ -452,15 +452,12 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	
 	let tcpSocket;
 	try {
-	    // 等待第一个成功连接的结果
-	    tcpSocket = await Promise.race([directConnect, socksConnect, proxyConnect]);
-	
-	    // 成功后再写入数据，避免冲突
+	    tcpSocket = await connectAndWrite(addressRemote, portRemote, false);
 	    const writer = tcpSocket.writable.getWriter();
 	    await writer.write(rawClientData);
 	    writer.releaseLock();
 	} catch (error) {
-	    log("All initial connections failed, retrying...");
+	    log("Direct connection failed.");
 	    await retry();
 	    return;
 	}
