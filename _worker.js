@@ -452,14 +452,25 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	
 	let tcpSocket;
 	try {
-	    tcpSocket = await Promise.any([directConnect, socksConnect, proxyConnect]);
+	    // 首先直接连接
+	    tcpSocket = await connectAndWrite(addressRemote, portRemote, false);
+	} catch (error) {
+	    log("Direct connection failed, trying SOCKS5 or proxy IP...");
+	
+	    // 直接连接失败后，再尝试 SOCKS5 或 proxy IP
+	    tcpSocket = useSocks
+	        ? await connectAndWrite(addressRemote, portRemote, true)
+	        : await connectAndWrite(proxyIP, portRemote, false);
+	}
+	
+	// 连接成功后，传输数据
+	if (tcpSocket) {
 	    const writer = tcpSocket.writable.getWriter();
 	    await writer.write(rawClientData);
 	    writer.releaseLock();
-	} catch (error) {
-	    log("All connections failed.");
+	    remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
+	} else {
 	    await retry();
-	    return;
 	}
 
 	// 当远程 Socket 就绪时，将其传递给 WebSocket
