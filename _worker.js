@@ -463,7 +463,6 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 	    const writer = tcpSocket.writable.getWriter();
 	    await writer.write(rawClientData);
 	    writer.releaseLock();
-	    remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
 	} else {
 	    await retry();
 	}
